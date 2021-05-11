@@ -39,13 +39,13 @@ class Wall:
 
 
 class Text:
-    def __init__(self, font_path: str, size: int, pos: list, init_value: str, color: list=(0, 0, 0), antialias: bool=False):
-        self.size = size
+    def __init__(self, font_path: str, font_size: int, pos: list, init_value: str, color: list=(0, 0, 0), antialias: bool=False):
+        self.size = font_size
         self.value = init_value
         self.antia = antialias
         self.color = color
         self.pos = pos
-        self.font = pygame.font.Font(font_path, size)
+        self.font = pygame.font.Font(font_path, font_size)
         self.text = self.font.render(init_value, antialias, color)
 
     def render(self, display: object):
@@ -72,3 +72,38 @@ class Text:
 
     def set_pos(self, new_pos: list):
         self.pos = new_pos
+
+class Button:
+    def __init__(self, rect: object, text: object, bg_color: list, bg_color_pressed: list):
+        self.rect = rect
+        self.text = text
+        self.bg_color = bg_color
+        self.bg_color_pressed = bg_color_pressed
+        self.original_text_color = text.color
+        self.pressed = False
+        self.text_shade = 0
+        self.text.pos = [
+            (self.rect[2] - text.text.get_width())/2 + self.rect[0],
+            (self.rect[3] - text.text.get_height())/2 + self.rect[1]
+        ]
+
+    def render(self, display: object):
+        bg_clr = self.bg_color
+        if self.pressed:
+            bg_clr = self.bg_color_pressed
+        pygame.draw.rect(display, bg_clr, self.rect)
+        self.text.render(display)
+
+    def modify_text_shade(self, add_value: int):
+        self.text_shade += add_value
+        self.text.set_color([abs(x+self.text_shade) for x in self.original_text_color])
+
+    def is_over(self, point: list):
+        return self.rect.collidepoint(point)
+
+    def set_colors(self, normal_color: list=None, pressed_color: list=None, text_color: list=None):
+        self.bg_color = normal_color if not None else self.bg_color
+        self.bg_color_pressed = pressed_color if not None else self.bg_color_pressed
+        if text_color:
+            self.text.set_color(text_color)
+            self.original_text_color = text_color
