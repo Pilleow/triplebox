@@ -11,7 +11,6 @@ WALL_WIDTH = 60
 WALL_HEIGHT = 60
 FPS = 60
 
-
 # non-main functions --- #
 def generate_new_blocks(color:list, x_offset: int = 0, block_count: int=3) -> list:
     blocks = []
@@ -26,6 +25,32 @@ def generate_new_blocks(color:list, x_offset: int = 0, block_count: int=3) -> li
         blocks.append(Wall(rect, color))
 
     return blocks
+
+
+def generate_new_shop_list():
+    l = []
+    for i, item in enumerate(shop_data):
+        new_btn = DrawingButton(pygame.Rect((RES[0]-210)/2+50, (RES[1]-210)/2 + 300*i, 210, 210))
+        new_btn.add_drawing('rect', [15,15,15], pygame.Rect(0, 0, 210, 210))
+        if item[0]:
+            new_btn.add_drawing('rect', item[1][0], pygame.Rect(6, 6, 66, 198))
+            new_btn.add_drawing('rect', item[1][1], pygame.Rect(72, 6, 66, 198))
+            new_btn.add_drawing('rect', item[1][2], pygame.Rect(138, 6, 66, 198))
+        else:
+            new_btn.add_drawing('rect', [200, 200, 200], pygame.Rect(105-20, 105-30, 40, 30))
+            new_btn.add_drawing('rect', [15, 15, 15], pygame.Rect(105-10, 105-20, 20, 25))
+            new_btn.add_drawing('rect', [200, 200, 200], pygame.Rect(105-30, 105, 60, 35))
+
+        price_txt = Text(
+            'fonts/Signika.ttf', 50, [0, 0], 
+            str(item[2])+" Coins" if (item[2] != 0 or not item[0]) else "", 
+            colors[(color_abs_id+2) % 3], 
+            True
+        )
+        price_txt.set_pos_to_center(RES, [-200, new_btn.rect[1]-195])
+        l.append([new_btn, price_txt])
+
+    return l
 
 
 # pygame stuff --- #
@@ -95,25 +120,7 @@ walls.extend(
     + generate_new_blocks(colors[(color_abs_id+1) % 3], 
     (RES[0] + WALL_WIDTH)//2)
 )
-for i, item in enumerate(shop_data):
-    new_btn = DrawingButton(pygame.Rect((RES[0]-210)/2+50, (RES[1]-210)/2 + 300*i, 210, 210))
-    new_btn.add_drawing('rect', [15,15,15], pygame.Rect(0, 0, 210, 210))
-    new_btn.add_drawing('rect', item[1][0], pygame.Rect(6, 6, 66, 198))
-    new_btn.add_drawing('rect', item[1][1], pygame.Rect(72, 6, 66, 198))
-    new_btn.add_drawing('rect', item[1][2], pygame.Rect(138, 6, 66, 198))
-    if not item[0]:
-        new_btn.add_drawing('line', [15, 15, 15], [5, 5], [205, 205], 7)
-        new_btn.add_drawing('line', [15, 15, 15], [5, 205], [205, 5], 7)
-
-    price_txt = Text(
-        'fonts/Signika.ttf', 50, [0, 0], 
-        str(item[2])+" Coins" if (item[2] != 0 or not item[0]) else "", 
-        colors[(color_abs_id+2) % 3], 
-        True
-    )
-    price_txt.set_pos_to_center(RES, [-200, new_btn.rect[1]-195])
-
-    shop_list.append([new_btn, price_txt])
+shop_list = generate_new_shop_list()
 
 # deleting unneeded variables --- #
 del init_txt_color
@@ -123,7 +130,7 @@ del icon
 # main functions --- #
 def events():
     """ All pygame.event and keyboard stuff here. """
-    global main_run, game_over, next_scene_id, colors
+    global main_run, game_over, next_scene_id, colors, shop_list
     mouse_pos = pygame.mouse.get_pos()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -166,7 +173,14 @@ def events():
                         if shop_data[i][2] <= data['money']:
                             shop_data[i][0] = True
                             data['money'] -= shop_data[i][2]
-                            b[0].drawings = b[0].drawings[:-2]
+
+                            money_txt.set_value(str(data['money'])+" Coins")
+                            money_txt.set_pos([30,30])
+                            b[0].drawings = []
+                            b[0].add_drawing('rect', [15,15,15], pygame.Rect(0, 0, 210, 210))
+                            b[0].add_drawing('rect', shop_data[i][1][0], pygame.Rect(6, 6, 66, 198))
+                            b[0].add_drawing('rect', shop_data[i][1][1], pygame.Rect(72, 6, 66, 198))
+                            b[0].add_drawing('rect', shop_data[i][1][2], pygame.Rect(138, 6, 66, 198))
                             break
     
     keys = pygame.key.get_pressed()
