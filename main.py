@@ -28,18 +28,32 @@ def generate_new_blocks(color:list, x_offset: int = 0, block_count: int=3) -> li
     return blocks
 
 
-# objects & vars --- #
+# pygame stuff --- #
 pygame.init()
 display = pygame.display.set_mode(RES)
 clock = pygame.time.Clock()
 pygame.display.set_caption("Triplebox!")
 icon = pygame.image.load('imgs/icon.png').convert_alpha()
 pygame.display.set_icon(icon)
-del icon
 
+# loading stuff --- #
 with open('data/data.json', 'r') as f:
-    data = json.load(f)
+    all_data = json.load(f)
+    data = all_data['data']
+    shop_data = all_data['shop']
 
+# variables --- #
+
+score = 0
+color_abs_id = 0
+text_fade_in_factor = 150
+main_run = True
+game_over = False
+walls = []
+btn_list = []
+shop_list = []
+colors = shop_data[0][1]
+init_txt_color = [x-15 for x in colors[(color_abs_id+2) % 3]]
 scene_id = 0
 next_scene_id = 0
 '''
@@ -47,65 +61,76 @@ next_scene_id = 0
 1 = shop 
 '''
 
-color_abs_id = 0
-main_run = True
-game_over = False
-colors = [(252, 163, 17), (20, 33, 61), (229, 229, 229)]
+# custom objects --- #
+score_txt = Text('fonts/Signika.ttf', 400, [0, 0], str(score), init_txt_color, True)
+score_txt.set_pos_to_center(RES, [0, -10])
+hiscore_txt = Text(
+    'fonts/Signika.ttf', 48, [0, 0], 
+    "Highscore: "+str(data['hiscore']), 
+    init_txt_color, True
+)
+hiscore_txt.set_pos_to_center(RES, [0, 160])
+shop_button_txt = Text('fonts/Signika.ttf', 72, [0, 0], 'S', init_txt_color, True)
+money_txt = Text(
+    'fonts/Signika.ttf', 48, [0, 0], 
+    "Currency: "+str(data['money']), 
+    init_txt_color, True
+)
+money_txt.set_pos_to_center(RES, [0, -180])
 
-walls = []
+player = Player(
+    pygame.Rect(-50, RES[1]//2-25, 50, 50),
+    colors[color_abs_id % 3]
+)
+
+# filling lists --- #
+btn_list.append(TextButton(
+    pygame.Rect(RES[0]-106, 10, 96, 96), 
+    colors[(color_abs_id+2) % 3],
+    [x-7 for x in colors[(color_abs_id+2) % 3]],
+    shop_button_txt
+))
 walls.extend(
     generate_new_blocks(colors[(color_abs_id+1) % 3]) 
     + generate_new_blocks(colors[(color_abs_id+1) % 3], 
     (RES[0] + WALL_WIDTH)//2)
 )
+for i, item in enumerate(shop_data):
+    new_btn = DrawingButton(pygame.Rect((RES[0]-210)/2, (RES[1]-210)/2 + 300*i, 210, 210))
+    new_btn.add_drawing('rect', [15,15,15], pygame.Rect(0, 0, 210, 210))
+    new_btn.add_drawing('rect', item[1][0], pygame.Rect(6, 6, 66, 198))
+    new_btn.add_drawing('rect', item[1][1], pygame.Rect(72, 6, 66, 198))
+    new_btn.add_drawing('rect', item[1][2], pygame.Rect(138, 6, 66, 198))
+    if not item[0]:
+        new_btn.add_drawing('line', [15, 15, 15], [5, 5], [205, 205], 7)
+        new_btn.add_drawing('line', [15, 15, 15], [5, 205], [205, 5], 7)
 
-score = 0
-btn_list = []
-text_fade_in_factor = 150
-init_txt_color = [x-15 for x in colors[(color_abs_id+2) % 3]]
-score_txt = Text('fonts/Signika.ttf', 400, [0, 0], str(score), init_txt_color, True)
-score_txt.set_pos_to_center(RES, [0, -10])
+    shop_list.append(new_btn)
 
-hiscore_txt = Text(
-    'fonts/Signika.ttf', 48, [0, 0],
-    "Highscore: "+str(data['hiscore']),
-    init_txt_color, True
-)
-hiscore_txt.set_pos_to_center(RES, [0, 160])
-
-player = Player(
-    pygame.Rect(-50, RES[1]//2-25, 50, 50),
-    [pygame.image.load(f'imgs/player_{x}.png').convert_alpha() for x in range(3)],
-    color_abs_id % 3
-)
-
-shop_button_txt = Text('fonts/Signika.ttf', 72, [0, 0], 'S', init_txt_color, True)
-btn_list.append(Button(
-    pygame.Rect(RES[0]-106, 10, 96, 96), 
-    shop_button_txt, 
-    colors[(color_abs_id+2) % 3], 
-    [x-7 for x in colors[(color_abs_id+2) % 3]]
-))
+# deleting unneeded variables --- #
 del init_txt_color
+del icon
 
 
 # main functions --- #
 def events():
-    global main_run, game_over, next_scene_id
+    global main_run, game_over, next_scene_id, colors
     mouse_pos = pygame.mouse.get_pos()
-    """ All pygame.event stuff here. """
+    """ All pygame.event and keyboard stuff here. """
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             main_run = False
 
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE and not game_over:
-                player.jump()
+            if scene_id == 0:
+                if event.key == pygame.K_SPACE and not game_over:
+                    player.jump()
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             for b in btn_list:
                 if b.is_over(mouse_pos):
                     b.pressed = True
+
         elif event.type == pygame.MOUSEBUTTONUP:
             if btn_list[0].pressed:  # shop button
                 btn_list[0].pressed = False
@@ -114,9 +139,38 @@ def events():
                     next_scene_id = 1
                 else:
                     next_scene_id = 0
+                    with open('data/data.json', 'w') as f:
+                        json.dump(all_data, f)
+
+            if scene_id == 1:
+                for i, b in enumerate(shop_list):
+                    if b.is_over(mouse_pos):
+                        if shop_data[i][0]:
+                            colors = shop_data[i][1]
+                            for btn in btn_list:
+                                btn.set_colors(
+                                    colors[(color_abs_id+2) % 3],
+                                    [x-7 for x in colors[(color_abs_id+2) % 3]],
+                                    [x-15 for x in colors[(color_abs_id+2) % 3]]
+                                )
+                            break
+                        if shop_data[i][2] <= data['money']:
+                            shop_data[i][0] = True
+                            data['money'] -= shop_data[i][2]
+                            b.drawings = b.drawings[:-2]
+                            break
     
+    keys = pygame.key.get_pressed()
+    if scene_id == 1:
+        if keys[pygame.K_UP] and shop_list[-1].rect[1] + shop_list[-1].rect[3] > RES[1]/2:
+            for i in shop_list:
+                i.rect[1] -= 10
+        elif keys[pygame.K_DOWN] and shop_list[0].rect[1] < RES[1]/2:
+            for i in shop_list:
+                i.rect[1] += 10
+
     for b in btn_list:
-        if b.is_over(mouse_pos) and b.text_shade > -10:
+        if b.is_over(mouse_pos) and b.text_shade > -20:
             b.modify_text_shade(-1)
         elif b.text_shade < 0:
             b.modify_text_shade(1)
@@ -130,14 +184,14 @@ def update():
         player.rect.height *= 1.04
         player.rect.x -= 0.02*player.rect.width
         player.rect.y -= 0.02*player.rect.height
-        player.sprites[player.sprite_id] = pygame.transform.scale(
-            player.sprites[player.sprite_id], 
+        player.surface = pygame.transform.scale(
+            player.surface, 
             player.rect[2:4]
         )
 
         if player.rect.width > 2.5*RES[0] and player.rect.height > 2.5*RES[1]:
             with open('data/data.json', 'w') as f:
-                json.dump(data, f)
+                json.dump(all_data, f)
 
             game_over = False
             score = 0
@@ -150,8 +204,7 @@ def update():
             score_txt.set_pos_to_center(RES, [0, -10])
             player = Player(
                 pygame.Rect(-50, RES[1]//2-25, 50, 50), 
-                [pygame.image.load(f'imgs/player_{x}.png').convert_alpha() for x in range(3)],
-                color_abs_id % 3
+                colors[color_abs_id % 3]
             )
             walls.extend(
                 generate_new_blocks(colors[(color_abs_id+1) % 3]) 
@@ -161,6 +214,7 @@ def update():
 
             score_txt.set_color(colors[(color_abs_id+2) % 3])
             hiscore_txt.set_color(colors[(color_abs_id+2) % 3])
+            money_txt.set_color(colors[(color_abs_id+2) % 3])
             for btn in btn_list:
                 btn.set_colors(
                     colors[(color_abs_id+2) % 3],
@@ -190,8 +244,11 @@ def update():
     if len(walls) < 6:
         walls.extend(generate_new_blocks(colors[(color_abs_id+1) % 3]))
         score += 1
+        data['money'] += 1
         score_txt.set_value(str(score))
         score_txt.set_pos_to_center(RES, [0, -10])
+        money_txt.set_value("Currency: "+str(data['money']))
+        money_txt.set_pos_to_center(RES, [0, -180])
         if score > data['hiscore']:
             data['hiscore'] = score
             hiscore_txt.set_value("Highscore: "+str(data['hiscore']))
@@ -202,6 +259,7 @@ def update():
         c = [round(x-15+(text_fade_in_factor/10)) for x in colors[(color_abs_id+2) % 3]]
         score_txt.set_color(c)
         hiscore_txt.set_color(c)
+        money_txt.set_color(c)
         text_fade_in_factor -= 1
 
 def render(display: object):
@@ -214,12 +272,14 @@ def render(display: object):
     if scene_id == 0:  # main game loop
         score_txt.render(display)
         hiscore_txt.render(display)
+        money_txt.render(display)
         for w in walls:
             w.render(display)
         player.render(display)
 
     elif scene_id == 1:
-        pass
+        for i in shop_list:
+            i.render(display)
 
     pygame.display.update()
 

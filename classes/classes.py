@@ -3,14 +3,14 @@ import math
 
 
 class Player:
-    def __init__(self, rect: object, sprites:list, sprite_id:int, jump_force: int=12, gravity_force: float=0.6):
+    def __init__(self, rect: object, color: list, jump_force: int=12, gravity_force: float=0.6):
         self.rect = rect
-        self.sprites = [pygame.transform.smoothscale(x, rect[2:4]) for x in sprites]
-        self.sprite_id = sprite_id
         self.jump_force = jump_force
         self.gravity_force = gravity_force
         self.gravity = -10
         self.x_anim_entry = 10
+        self.surface = pygame.Surface((self.rect[2], self.rect[3])).convert_alpha()
+        self.set_color(color)
 
     def jump(self):
         self.gravity = -self.jump_force
@@ -19,11 +19,14 @@ class Player:
         self.gravity += self.gravity_force
 
     def apply_gravity(self):
-        self.rect.y += self.gravity
+        self.rect.y += self.gravity        
+
+    def set_color(self, new_color: list):
+        self.surface.fill(new_color)
 
     def render(self, display: object):
         rotated_img = pygame.transform.rotate(
-            self.sprites[self.sprite_id], 
+            self.surface, 
             -45*math.sin(self.gravity/45)
         )
         display.blit(rotated_img, self.rect[0:2])
@@ -74,14 +77,22 @@ class Text:
         self.pos = new_pos
 
 class Button:
-    def __init__(self, rect: object, text: object, bg_color: list, bg_color_pressed: list):
+    def __init__(self, rect: object, bg_color: list, bg_color_pressed: list):
         self.rect = rect
-        self.text = text
         self.bg_color = bg_color
         self.bg_color_pressed = bg_color_pressed
-        self.original_text_color = text.color
         self.pressed = False
+
+    def is_over(self, point: list):
+        return self.rect.collidepoint(point)
+
+
+class TextButton(Button):
+    def __init__(self, rect: object, bg_color: list, bg_color_pressed: list, text: object):
+        super().__init__(rect, bg_color, bg_color_pressed)
+        self.text = text
         self.text_shade = 0
+        self.original_text_color = text.color
         self.text.pos = [
             (self.rect[2] - text.text.get_width())/2 + self.rect[0],
             (self.rect[3] - text.text.get_height())/2 + self.rect[1]
@@ -91,6 +102,7 @@ class Button:
         bg_clr = self.bg_color
         if self.pressed:
             bg_clr = self.bg_color_pressed
+
         pygame.draw.rect(display, bg_clr, self.rect)
         self.text.render(display)
 
@@ -98,12 +110,44 @@ class Button:
         self.text_shade += add_value
         self.text.set_color([abs(x+self.text_shade) for x in self.original_text_color])
 
-    def is_over(self, point: list):
-        return self.rect.collidepoint(point)
-
     def set_colors(self, normal_color: list=None, pressed_color: list=None, text_color: list=None):
         self.bg_color = normal_color if not None else self.bg_color
         self.bg_color_pressed = pressed_color if not None else self.bg_color_pressed
         if text_color:
             self.text.set_color(text_color)
             self.original_text_color = text_color
+
+
+class DrawingButton(Button):
+    def __init__(self, rect: object):
+        self.rect = rect
+        self.drawings = []
+
+    def render(self, display: object):
+        for d in self.drawings:
+            if d[0] == 'rect':
+                rect = [d[1][1][0] + self.rect[0], d[1][1][1] + self.rect[1], d[1][1][2], d[1][1][3]]
+                pygame.draw.rect(display, d[1][0], rect)
+            elif d[0] == 'polygon':
+                points = [[c[0] + self.rect[0], c[1] + self.rect[1]] for c in d[1][1]]
+                pygame.draw.polygon(display, d[1][0], points)
+            elif d[0] == 'circle':
+                center = [d[1][1][0] + self.rect[0], d[1][1][1] + self.rect[1]]
+                pygame.draw.circle(display, d[1][0], center, d[1][2])
+            elif d[0] == 'ellipse':
+                rect = [d[1][1][0] + self.rect[0], d[1][1][1] + self.rect[1], d[1][1][2], d[1][1][3]]
+                pygame.draw.ellipse(display, d[1][0], rect)
+            elif d[0] == 'arc':
+                rect = [d[1][1][0] + self.rect[0], d[1][1][1] + self.rect[1], d[1][1][2], d[1][1][3]]
+                pygame.draw.arc(display, d[1][0], rect, d[1][2], d[1][3])
+            elif d[0] == 'line':
+                point_1 = [d[1][1][0] + self.rect[0], d[1][1][1] + self.rect[1]]
+                point_2 = [d[1][2][0] + self.rect[0], d[1][2][1] + self.rect[1]]
+                pygame.draw.line(display, d[1][0], point_1, point_2, d[1][3])
+            elif d[0] == 'aaline':
+                point_1 = [d[1][1][0] + self.rect[0], d[1][1][1] + self.rect[1]]
+                point_2 = [d[1][2][0] + self.rect[0], d[1][2][1] + self.rect[1]]
+                pygame.draw.aaline(display, d[1][0], point_1, point_2)
+
+    def add_drawing(self, type: str, *args):
+        self.drawings.append([type, args])
