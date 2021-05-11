@@ -40,6 +40,13 @@ del icon
 with open('data/data.json', 'r') as f:
     data = json.load(f)
 
+scene_id = 0
+next_scene_id = 0
+'''
+0 = main game loop
+1 = shop 
+'''
+
 color_abs_id = 0
 main_run = True
 game_over = False
@@ -84,7 +91,7 @@ del init_txt_color
 
 # main functions --- #
 def events():
-    global main_run
+    global main_run, game_over, next_scene_id
     mouse_pos = pygame.mouse.get_pos()
     """ All pygame.event stuff here. """
     for event in pygame.event.get():
@@ -102,7 +109,11 @@ def events():
         elif event.type == pygame.MOUSEBUTTONUP:
             if btn_list[0].pressed:  # shop button
                 btn_list[0].pressed = False
-                # redirect to shop here
+                if scene_id == 0:
+                    game_over = True
+                    next_scene_id = 1
+                else:
+                    next_scene_id = 0
     
     for b in btn_list:
         if b.is_over(mouse_pos) and b.text_shade > -10:
@@ -112,7 +123,7 @@ def events():
 
 
 def update():
-    global walls, game_over, player, color_abs_id, score, text_fade_in_factor
+    global walls, game_over, player, color_abs_id, score, text_fade_in_factor, scene_id
     """ All updating related stuff here. """
     if game_over:
         player.rect.width *= 1.04
@@ -129,24 +140,26 @@ def update():
                 json.dump(data, f)
 
             game_over = False
-            color_abs_id += 1
+            score = 0
+            text_fade_in_factor = 150
+            walls = []
+            if scene_id == 0:
+                color_abs_id += 1
+
+            score_txt.set_value(str(score), update=False)
+            score_txt.set_pos_to_center(RES, [0, -10])
             player = Player(
                 pygame.Rect(-50, RES[1]//2-25, 50, 50), 
                 [pygame.image.load(f'imgs/player_{x}.png').convert_alpha() for x in range(3)],
                 color_abs_id % 3
             )
-            walls = []
             walls.extend(
                 generate_new_blocks(colors[(color_abs_id+1) % 3]) 
                 + generate_new_blocks(colors[(color_abs_id+1) % 3], 
                 (RES[0] + WALL_WIDTH)//2)
             )
 
-            score = 0
-            text_fade_in_factor = 150
-            score_txt.set_value(str(score), update=False)
             score_txt.set_color(colors[(color_abs_id+2) % 3])
-            score_txt.set_pos_to_center(RES, [0, -10])
             hiscore_txt.set_color(colors[(color_abs_id+2) % 3])
             for btn in btn_list:
                 btn.set_colors(
@@ -154,6 +167,9 @@ def update():
                     [x-7 for x in colors[(color_abs_id+2) % 3]],
                     [x-15 for x in colors[(color_abs_id+2) % 3]]
                 )
+
+            scene_id = next_scene_id
+
         return
 
     player.rect.x += player.x_anim_entry
@@ -192,14 +208,18 @@ def render(display: object):
     """ All rendering related stuff here. """
     ticks = pygame.time.get_ticks()
     display.fill(colors[(color_abs_id+2) % 3])
-
-    score_txt.render(display)
-    hiscore_txt.render(display)
     for b in btn_list:
         b.render(display)
-    for w in walls:
-        w.render(display)
-    player.render(display)
+
+    if scene_id == 0:  # main game loop
+        score_txt.render(display)
+        hiscore_txt.render(display)
+        for w in walls:
+            w.render(display)
+        player.render(display)
+
+    elif scene_id == 1:
+        pass
 
     pygame.display.update()
 
